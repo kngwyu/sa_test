@@ -1,6 +1,7 @@
 # 概要
 二次元ユークリッド平面上における巡回セールスマン問題における焼きなまし法の実装で、近傍関数は2-optを使用し数種類の冷却スケジュールを実装してあります。
 あくまで実験用のソースコードで、他人が使用することを前提に書かれていないので、可読性等にはかなり問題があると思われます。あと、コンパイルにすごく時間がかかります。
+デフォルトでは4コア使うのでスペックが低いPCだといっぱいいっぱいになってしまうかもしれません。
 
 ![example](./images/rat575_cool1_10sec.png)
 
@@ -35,15 +36,17 @@ USAGE:
     sa_test [FLAGS] [OPTIONS]
 
 FLAGS:
-    -V, --vis        Use Visualize(defualt false)
+    -V, --vis        Use Visualize(defualt=>false)
     -h, --help       Prints help information
         --version    Prints version information
 
 OPTIONS:
-    -C, --cooler <COOLER>    Sets cooler type(default climb)
-    -D, --debug <FNAME>      Use debug mode(only 1 thread runs and create Log file<FNAME>)
-    -I, --iter <ITER>        Sets iteration number(default 1)
-    -T, --time <TIME>        Sets execution time(default 5)
+    -C, --cooler <COOLER>    Sets cooler type(c1..c5 default=>climb)
+    -D, --debug <FNAME>      Use debug mode(only 1 thread runs and create Log
+                             file<FNAME>)
+    -I, --iter <ITER>        Sets iteration number(default=>1)
+    -T, --time <TIME>        Sets execution time(default=>5)
+
 ```
 
 # 著作権表示

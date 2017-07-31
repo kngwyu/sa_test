@@ -31,11 +31,11 @@ lazy_static!{
                   (version: "1.0")
                   (author: "kngwyu")
                   (about: "Test of simulated annealing")
-                  (@arg TIME: -T --time +takes_value "Sets execution time(default 5)")
-                  (@arg COOLER: -C --cooler +takes_value "Sets cooler type(default climb)")
-                  (@arg ITER: -I --iter +takes_value "Sets iteration number(default 1)")
+                  (@arg TIME: -T --time +takes_value "Sets execution time(default=>5)")
+                  (@arg COOLER: -C --cooler +takes_value "Sets cooler type(c1..c5 default=>climb)")
+                  (@arg ITER: -I --iter +takes_value "Sets iteration number(default=>1)")
                   (@arg FNAME: -D --debug +takes_value "Use debug mode(only 1 thread runs and create Log file<FNAME>)")
-                  (@arg VIS: -V --vis "Use Visualize(defualt false)")
+                  (@arg VIS: -V --vis "Use Visualize(defualt=>false)")
         ).get_matches();
     static ref LOGGER: slog::Logger = match MATCHES.value_of("FNAME") {
         Some(s) => sloggers::file::FileLoggerBuilder::new(s).level(Severity::Debug).build(),
@@ -392,6 +392,65 @@ impl Cooler for Cooler4 {
     }
 }
 
+// comparison of...の式(4)
+struct Cooler5 {
+    x: Real,
+    c: Real,
+    count: usize,
+    alpha: Real,
+    c0: Real,
+}
+
+impl Cooler5 {
+    fn new() -> Cooler5 {
+        Cooler5 {
+            x: 0.95,
+            c: 0.0,
+            count: 0,
+            alpha: 0.0005,
+            c0: 0.0,
+        }
+    }
+}
+impl Cooler for Cooler5 {
+    fn get_prob(&mut self, sa: &SaState, delta_c: Real) -> Real {
+        if sa.m2 == 0 {
+            self.x
+        } else if self.count < 100 {
+            self.x
+        } else {
+            let p = (-delta_c / self.c).exp();
+            p
+        }
+    }
+    fn decrement(&mut self, sa: &SaState) {
+        self.count += 1;
+        if self.count < 100 {
+            if self.count == 1 {
+                info!(LOGGER, ",count, c,");
+            }
+            if sa.m1 == 0 || sa.m2 == 0 {
+                return;
+            }
+            let (m1, m2) = (sa.m1 as Real, sa.m2 as Real);
+            let delta_c_ave = sa.delta_c_sum / m2;
+            self.c = delta_c_ave / loge(m2 / (m2 * self.x - m1 * (1.0 - self.x)));
+            self.x = (m1 + m2 * (-delta_c_ave / self.c).exp()) / (m1 + m2);
+        } else if self.count == 100 {
+            let hosei = sa.ord.len() as Real * 0.01;
+            self.c0 = (self.c / hosei).sqrt();
+        } else {
+            self.c = self.c - self.c * self.alpha / self.c0;
+            if self.count % 300 == 0 {
+                info!(LOGGER, ",{}, {},", self.count, self.c);
+            }
+        }
+    }
+    fn print_info(&self) {
+        println!("Cooler5: count: {}, c: {}", self.count, self.c)
+    }
+}
+
 // 焼きなまし法のコード
 fn annealing<C: Cooler>(
     points: &Vec<Point>,
@@ -516,6 +575,7 @@ fn main() {
                     "c2" => annealing(&p, time_limit, Cooler2::new()),
                     "c3" => annealing(&p, time_limit, Cooler3::new()),
                     "c4" => annealing(&p, time_limit, Cooler4::new()),
+                    "c5" => annealing(&p, time_limit, Cooler5::new()),
                     _ => {
                         println!("Unknow Cooling Type {}", &**cooler);
                         annealing(&p, time_limit, Climb::new())
