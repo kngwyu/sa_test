@@ -24,5 +24,5 @@ cargo run --release -- --time 3 --cooler c1 --iter 1 -D log.txt
 
 # 著作権表示
 [piston](https://github.com/PistonDevelopers/piston)、[slog](https://github.com/slog-rs/slog)、[clap](https://github.com/kbknapp/clap-rs)などのライブラリを使用しています。
-また、データはhttp://elib.zib.de/pub/mp-testdata/tsp/tsplib/tsplib.htmlのものを使用しました。
+また、データはTSPLIB[http://elib.zib.de/pub/mp-testdata/tsp/tsplib/tsplib.html]のものを使用しました。
 このソフトウェア自体はUnlicenseのもとで公開します。
