@@ -233,7 +233,7 @@ impl Cooler2 {
             x: 0.95,
             c: 0.0,
             count: 0,
-            alpha: 0.9999, // 手動で調整してください 5sec 0.9999 10sec 0.99999 20sec 0.999995くらい
+            alpha: 0.999995, // 手動で調整してください 5sec 0.9999 10sec 0.99999 20sec 0.999995くらい
         }
     }
 }
@@ -288,7 +288,7 @@ impl Cooler3 {
             x: 0.95,
             c: 0.0,
             count: 0,
-            alpha: 1e-7, // C0 * alpha = gamma 手動で調整してください(1e-8 / (secs / 5)が基本)
+            alpha: 1e-7 * 0.5, // C0 * alpha = gamma 手動で調整してください
             gamma: 0.0,
         }
     }
@@ -322,7 +322,7 @@ impl Cooler for Cooler3 {
             self.gamma = self.c * self.alpha * hosei;
         } else {
             self.c = (self.c - self.gamma).max(0.0);
-            if self.count % 1000 == 0 {
+            if self.count % 300 == 0 {
                 info!(LOGGER, ",{}, {},", self.count, self.c);
             }
         }
@@ -332,34 +332,65 @@ impl Cooler for Cooler3 {
     }
 }
 
-// struct Cooler3 {
-//     t0: Real,
-//     n: Real,
-//     alpha: Real,
-//     beta: Real,
-// }
-// impl Cooler3 {
-//     fn new() -> Cooler3 {
-//         Cooler3 {
-//             t0: 30000.0,
-//             n: 50000.0 * 3.0, // 一秒に五万回遷移すると仮定
-//             alpha: 1.0,
-//             beta: 4.0,
-//         }
-//     }
-// }
+// comparison of...の式(4)
+struct Cooler4 {
+    x: Real,
+    c: Real,
+    count: usize,
+    alpha: Real,
+    c0: Real,
+}
 
-// impl Cooler for Cooler3 {
-//     fn get_prob(&mut self, sa: &SaState, delta_c: Real) -> Real {
-//         let progress = ((sa.m1 + sa.m2) as Real + 0.5) / self.n;
-//         let remain = 1.0 - progress;
-//         let t = self.t0 * remain.powf(self.alpha) * (-progress * self.beta).exp2();
-//         let p = (-delta_c / t).exp();
-//         p
-//     }
-//     fn decrement(&mut self, sa: &SaState) {}
-//     fn print_info(&self) {}
-// }
+impl Cooler4 {
+    fn new() -> Cooler4 {
+        Cooler4 {
+            x: 0.95,
+            c: 0.0,
+            count: 0,
+            alpha: 0.05,
+            c0: 0.0,
+        }
+    }
+}
+impl Cooler for Cooler4 {
+    fn get_prob(&mut self, sa: &SaState, delta_c: Real) -> Real {
+        if sa.m2 == 0 {
+            self.x
+        } else if self.count < 100 {
+            self.x
+        } else {
+            let p = (-delta_c / self.c).exp();
+            p
+        }
+    }
+    fn decrement(&mut self, sa: &SaState) {
+        self.count += 1;
+        if self.count < 100 {
+            if self.count == 1 {
+                info!(LOGGER, ",count, c,");
+            }
+            if sa.m1 == 0 || sa.m2 == 0 {
+                return;
+            }
+            let (m1, m2) = (sa.m1 as Real, sa.m2 as Real);
+            let delta_c_ave = sa.delta_c_sum / m2;
+            self.c = delta_c_ave / loge(m2 / (m2 * self.x - m1 * (1.0 - self.x)));
+            self.x = (m1 + m2 * (-delta_c_ave / self.c).exp()) / (m1 + m2);
+        } else if self.count == 100 {
+            let hosei = sa.ord.len() as Real * 0.01;
+            self.c0 = self.c * self.alpha / hosei;
+        } else {
+            let m0 = (sa.m1 + sa.m2) as Real;
+            self.c = self.c0 / loge(m0 + 1.0);
+            if self.count % 300 == 0 {
+                info!(LOGGER, ",{}, {},", self.count, self.c);
+            }
+        }
+    }
+    fn print_info(&self) {
+        println!("Cooler4: count: {}, c: {}", self.count, self.c)
+    }
+}
 
 // 焼きなまし法のコード
 fn annealing<C: Cooler>(
@@ -442,7 +473,7 @@ fn main() {
         Ok(t) => t,
         Err(_) => panic!("usage: --time 10"),
     };
-    let time_limit = Duration::from_secs(10);
+    let time_limit = Duration::from_secs(time);
     let coolers = Arc::new(MATCHES.value_of("COOLER").unwrap_or("climb").to_owned());
     let vis = MATCHES.is_present("VIS");
     let loop_num = match MATCHES.value_of("ITER").unwrap_or("1").parse::<usize>() {
@@ -484,18 +515,12 @@ fn main() {
                     "c1" => annealing(&p, time_limit, Cooler1::new()),
                     "c2" => annealing(&p, time_limit, Cooler2::new()),
                     "c3" => annealing(&p, time_limit, Cooler3::new()),
-                    _ => annealing(&p, time_limit, Climb::new()),
+                    "c4" => annealing(&p, time_limit, Cooler4::new()),
+                    _ => {
+                        println!("Unknow Cooling Type {}", &**cooler);
+                        annealing(&p, time_limit, Climb::new())
+                    }
                 };
-                // println!(
-                //     "{} best score: {}(m1: {}, m2: {}) final score: {}(m1: {}, m2: {})",
-                //     s,
-                //     best_state.score,
-                //     best_state.m1,
-                //     best_state.m2,
-                //     final_state.score,
-                //     final_state.m1,
-                //     final_state.m2
-                // );
                 sum += best_state.score;
                 sqsum += best_state.score * best_state.score;
                 if vis {
