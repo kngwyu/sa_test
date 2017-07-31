@@ -18,9 +18,12 @@ releaseビルドだと複数ウインドウが開けないバグがあります�
 
 ログファイルに出力する
 ```
-cargo run --release -- --time 3 --cooler c1 --iter 1 -D log.txt
+cargo run --release -- --time 3 --cooler c1 --iter 1 --debug log.txt
 ```
 1つのデータのみを1スレッドで実行します。ログファイルには上書きせず追記します。
+
+ヘルプを見る
+
 
 # 著作権表示
 [piston](https://github.com/PistonDevelopers/piston)、[slog](https://github.com/slog-rs/slog)、[clap](https://github.com/kbknapp/clap-rs)などのライブラリを使用しています。

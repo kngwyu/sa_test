@@ -195,7 +195,7 @@ impl Cooler for Cooler1 {
         self.count += 1;
         if self.count < 100 {
             if self.count == 1 {
-                // むりやりCSVにするために変なことをしている
+                // あとでむりやりCSVに変換するために変なことをしている
                 info!(LOGGER, ",count, c,");
             }
             if sa.m1 == 0 || sa.m2 == 0 {
@@ -233,13 +233,12 @@ impl Cooler2 {
             x: 0.95,
             c: 0.0,
             count: 0,
-            alpha: 0.999995, // 手動で調整してください
+            alpha: 0.9999, // 手動で調整してください 5sec 0.9999 10sec 0.99999 20sec 0.999995くらい
         }
     }
 }
 impl Cooler for Cooler2 {
     fn get_prob(&mut self, sa: &SaState, delta_c: Real) -> Real {
-        self.count += 1;
         if sa.m2 == 0 {
             self.x
         } else if self.count < 100 {
@@ -250,7 +249,11 @@ impl Cooler for Cooler2 {
         }
     }
     fn decrement(&mut self, sa: &SaState) {
+        self.count += 1;
         if self.count < 100 {
+            if self.count == 1 {
+                info!(LOGGER, ",count, c,");
+            }
             if sa.m1 == 0 || sa.m2 == 0 {
                 return;
             }
@@ -260,40 +263,103 @@ impl Cooler for Cooler2 {
             self.x = (m1 + m2 * (-delta_c_ave / self.c).exp()) / (m1 + m2);
         } else {
             self.c *= self.alpha;
+            if self.count % 300 == 0 {
+                info!(LOGGER, ",{}, {},", self.count, self.c);
+            }
         }
     }
     fn print_info(&self) {
         println!("Cooler2: count: {}, c: {}", self.count, self.c)
     }
 }
+
+// Linear
 struct Cooler3 {
-    t0: Real,
-    n: Real,
+    x: Real,
+    c: Real,
+    count: usize,
     alpha: Real,
-    beta: Real,
+    gamma: Real,
 }
+
 impl Cooler3 {
     fn new() -> Cooler3 {
         Cooler3 {
-            t0: 30000.0,
-            n: 50000.0 * 3.0, // 一秒に五万回遷移すると仮定
-            alpha: 1.0,
-            beta: 4.0,
+            x: 0.95,
+            c: 0.0,
+            count: 0,
+            alpha: 1e-7, // C0 * alpha = gamma 手動で調整してください(1e-8 / (secs / 5)が基本)
+            gamma: 0.0,
         }
     }
 }
-
 impl Cooler for Cooler3 {
     fn get_prob(&mut self, sa: &SaState, delta_c: Real) -> Real {
-        let progress = ((sa.m1 + sa.m2) as Real + 0.5) / self.n;
-        let remain = 1.0 - progress;
-        let t = self.t0 * remain.powf(self.alpha) * (-progress * self.beta).exp2();
-        let p = (-delta_c / t).exp();
-        p
+        if sa.m2 == 0 {
+            self.x
+        } else if self.count < 100 {
+            self.x
+        } else {
+            let p = (-delta_c / self.c).exp();
+            p
+        }
     }
-    fn decrement(&mut self, sa: &SaState) {}
-    fn print_info(&self) {}
+    fn decrement(&mut self, sa: &SaState) {
+        self.count += 1;
+        if self.count < 100 {
+            if self.count == 1 {
+                info!(LOGGER, ",count, c,");
+            }
+            if sa.m1 == 0 || sa.m2 == 0 {
+                return;
+            }
+            let (m1, m2) = (sa.m1 as Real, sa.m2 as Real);
+            let delta_c_ave = sa.delta_c_sum / m2;
+            self.c = delta_c_ave / loge(m2 / (m2 * self.x - m1 * (1.0 - self.x)));
+            self.x = (m1 + m2 * (-delta_c_ave / self.c).exp()) / (m1 + m2);
+        } else if self.count == 100 {
+            let hosei = sa.ord.len() as Real * 0.01;
+            self.gamma = self.c * self.alpha * hosei;
+        } else {
+            self.c = (self.c - self.gamma).max(0.0);
+            if self.count % 1000 == 0 {
+                info!(LOGGER, ",{}, {},", self.count, self.c);
+            }
+        }
+    }
+    fn print_info(&self) {
+        println!("Cooler3: count: {}, c: {}", self.count, self.c)
+    }
 }
+
+// struct Cooler3 {
+//     t0: Real,
+//     n: Real,
+//     alpha: Real,
+//     beta: Real,
+// }
+// impl Cooler3 {
+//     fn new() -> Cooler3 {
+//         Cooler3 {
+//             t0: 30000.0,
+//             n: 50000.0 * 3.0, // 一秒に五万回遷移すると仮定
+//             alpha: 1.0,
+//             beta: 4.0,
+//         }
+//     }
+// }
+
+// impl Cooler for Cooler3 {
+//     fn get_prob(&mut self, sa: &SaState, delta_c: Real) -> Real {
+//         let progress = ((sa.m1 + sa.m2) as Real + 0.5) / self.n;
+//         let remain = 1.0 - progress;
+//         let t = self.t0 * remain.powf(self.alpha) * (-progress * self.beta).exp2();
+//         let p = (-delta_c / t).exp();
+//         p
+//     }
+//     fn decrement(&mut self, sa: &SaState) {}
+//     fn print_info(&self) {}
+// }
 
 // 焼きなまし法のコード
 fn annealing<C: Cooler>(
