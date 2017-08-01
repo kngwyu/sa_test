@@ -50,5 +50,5 @@ OPTIONS:
 
 # 著作権表示
 [piston](https://github.com/PistonDevelopers/piston)、[slog](https://github.com/slog-rs/slog)、[clap](https://github.com/kbknapp/clap-rs)などのライブラリを使用しています。
-また、データは[TSPLIB](http://elib.zib.de/pub/mp-testdata/tsp/tsplib/tsplib.htm)のものを使用しました。
+また、データは[TSPLIB](http://elib.zib.de/pub/mp-testdata/tsp/tsplib/tsplib.html)のものを使用しました。
 このソフトウェア自体はUnlicenseのもとで公開します。
